@@ -3,7 +3,7 @@ import { controllable, pausable, retryable } from './usenet.ts';
 import { protocolOf } from './size.ts';
 
 /** One entry in a row's ⋯ menu; the page maps each key to its handler. */
-export type RowItem = 'pause' | 'resume' | 'retry' | 'up' | 'down' | 'top' | 'bottom' | 'priority' | 'library' | 'remove';
+export type RowItem = 'pause' | 'resume' | 'retry' | 'reimport' | 'up' | 'down' | 'top' | 'bottom' | 'priority' | 'library' | 'remove';
 
 export type Priority = (typeof PRIORITIES)[number]['key'];
 
@@ -20,6 +20,7 @@ type RowBits = Parameters<typeof retryable>[0] & {
 	title_id?: number;
 	linked?: boolean;
 	outside?: boolean;
+	phase?: string;
 };
 
 /** What the details pane's ⋯ adds beyond the row's list. */
@@ -54,6 +55,8 @@ export function rowItems(r: RowBits): RowItem[] {
 		if (!!r.downloader_id && !!r.hash && r.protocol === 'torrent' && (!r.downloader_kind || r.downloader_kind === 'qbittorrent')) out.push('up', 'down', 'top', 'bottom');
 		else if (usenetQueued(r)) out.push('up', 'down', 'top', 'bottom', 'priority');
 	}
+	// A finished download is no longer actable in its Downloader, but HolyArrs can still import it again.
+	if (r.phase === 'needs_a_decision') out.push('reimport');
 	if (lib) out.push('library');
 	if (r.can_act) out.push('remove');
 	return out;

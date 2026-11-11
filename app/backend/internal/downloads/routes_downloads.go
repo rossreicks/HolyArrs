@@ -51,6 +51,7 @@ type DownloadRow struct {
 	FinishedAt     *time.Time `json:"finished_at,omitempty"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 	SlotState      string     `json:"slot_state,omitempty"`
+	SlotID         int64      `json:"slot_id,omitempty"`
 	CanAct         bool       `json:"can_act"` // Mark failed and Remove
 	// ClientLocked says HolyArrs may not change this row's Downloader (its switch
 	// is off, or it is listed read only): pause, queue and torrent controls are off,
@@ -386,7 +387,7 @@ func (a *Web) DownloadsView(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(d.SlotIDs) > 0 {
 			if si, ok := slots[d.SlotIDs[0]]; ok && si.full {
-				row.SlotState, row.TitleID, row.Title, row.Version, row.Kind = si.line.State, si.titleID, si.title, si.version, si.kind
+				row.SlotID, row.SlotState, row.TitleID, row.Title, row.Version, row.Kind = d.SlotIDs[0], si.line.State, si.titleID, si.title, si.version, si.kind
 				if si.year.Valid {
 					y := int(si.year.Int64)
 					row.Year = &y

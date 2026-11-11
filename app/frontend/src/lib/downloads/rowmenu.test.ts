@@ -24,6 +24,26 @@ describe('row actions menu', () => {
 			expect(rowItems({ can_act: true, protocol: 'usenet', downloader_kind: kind, downloader_id: 2, hash: 'n', phase: 'downloading' })).toEqual(['pause', 'up', 'down', 'top', 'bottom', 'priority', 'remove']);
 		expect(rowItems({ can_act: true, protocol: 'usenet', downloader_kind: 'nzbget', downloader_id: 2, hash: 'nzbid-4', phase: 'paused', state: 'paused' })[0]).toBe('resume');
 	});
+	it('rowItems__finishedDownloadWaitingOnADecision__offersRetryImportEvenWhenTheDownloaderCannotBeChanged', () => {
+		// given
+		const waiting = { can_act: false, protocol: 'usenet', downloader_kind: 'nzbget', downloader_id: 2, hash: 'n', title_id: 4, phase: 'needs_a_decision' };
+
+		// when
+		const items = rowItems(waiting);
+
+		// then
+		expect(items).toEqual(['reimport', 'library']);
+	});
+	it('rowItems__refusedImport__offersNoRetryImport', () => {
+		// given
+		const refused = { can_act: false, protocol: 'usenet', downloader_kind: 'nzbget', downloader_id: 2, hash: 'n', title_id: 4, phase: 'import_refused' };
+
+		// when
+		const items = rowItems(refused);
+
+		// then
+		expect(items).not.toContain('reimport');
+	});
 	it('keeps queue moves and priority off finished Usenet jobs', () => {
 		expect(rowItems({ can_act: true, protocol: 'usenet', downloader_kind: 'nzbget', downloader_id: 2, hash: 'n', phase: 'done' })).toEqual(['remove']);
 		expect(rowItems({ can_act: false, protocol: 'usenet', downloader_kind: 'sabnzbd', downloader_id: 2, hash: 'n', phase: 'downloading' })).toEqual([]);

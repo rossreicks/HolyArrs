@@ -545,6 +545,7 @@ export interface DownloadRow extends DownloadView {
 	finished_at?: string;
 	updated_at: string;
 	slot_state?: string;
+	slot_id?: number;
 	can_act: boolean;
 	client_locked?: boolean;
 	replaced?: boolean;

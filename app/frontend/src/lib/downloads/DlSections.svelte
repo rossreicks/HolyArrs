@@ -253,6 +253,7 @@
 		get pause() { return t('downloads.act.pause'); },
 		get resume() { return t('downloads.act.start'); },
 		get retry() { return t('downloads.act.again'); },
+		get reimport() { return t('downloads.act.reimport'); },
 		get up() { return t('downloads.act.up'); },
 		get down() { return t('downloads.act.down'); },
 		get top() { return t('downloads.act.top'); },
@@ -282,7 +283,10 @@
 		}
 	}
 	const usenetMove = (r: DownloadRow, k: string) => usenetCall(r, () => api.post(`${usenetItem(r)}/${k}`), MOVED[k] ?? t('downloads.act.moved'));
-	const usenetPriority = (r: DownloadRow, p: Priority, label: string) => usenetCall(r, () => api.post(`${usenetItem(r)}/priority`, { priority: p }), t('downloads.act.prioritySet', { label }));
+	// Any Slot of the download still waiting names it; the server imports all of them again.
+	const reimport = (r: DownloadRow) =>
+		usenetCall(r, () => api.post(`/needs-decision/${r.episodes?.find((e) => e.state === 'needs_a_decision')?.slot_id ?? r.slot_id}/decide`, { action: 'retry_import' }), t('downloads.act.reimporting'));
+	const usenetPriority =(r: DownloadRow, p: Priority, label: string) => usenetCall(r, () => api.post(`${usenetItem(r)}/priority`, { priority: p }), t('downloads.act.prioritySet', { label }));
 	// Shared by the row menu and the pane menu.
 	function menuItems(r: DownloadRow, keys: RowItem[]): MenuItem[] {
 		const off = busy === r.id || queueBusy === r.id;
@@ -290,6 +294,7 @@
 			const label = ROW_WORD[k];
 			if (k === 'priority') return [{ kind: 'heading', label }, ...PRIORITIES.map((p): MenuItem => ({ label: p.label, disabled: off, onselect: () => void usenetPriority(r, p.key, p.label) }))];
 			if ((k === 'up' || k === 'down' || k === 'top' || k === 'bottom') && usenetQueued(r)) return { label, disabled: off, onselect: () => void usenetMove(r, k) };
+			if (k === 'reimport') return { label, icon: 'refresh', disabled: off, onselect: () => void reimport(r) };
 			if (k === 'library') return { label, icon: 'film', href: to(`/library/${r.title_id}`) };
 			if (k === 'remove') return { label, icon: 'trash', destructive: true, disabled: off, onselect: () => onremove(r) };
 			if (k === 'pause' || k === 'resume') return { label, icon: k === 'pause' ? 'pause' : 'play', disabled: off, onselect: () => onact?.(r, k) };
@@ -298,8 +303,9 @@
 		});
 	}
 	function rowMenu(r: DownloadRow): MenuItem[] {
-		const items = menuItems(r, rowItems(r).filter((k) => k !== 'retry' || mayEdit(r)));
-		if (!r.can_act) items.unshift({ kind: 'heading', label: t('downloads.act.cannotChange') });
+		const keys = rowItems(r).filter((k) => k !== 'retry' || mayEdit(r));
+		const items = menuItems(r, keys);
+		if (!r.can_act && !keys.includes('reimport')) items.unshift({ kind: 'heading', label: t('downloads.act.cannotChange') });
 		return items;
 	}
 	// The pane menu is the row's list minus what the pane shows as buttons, plus a torrent's checks, force start, sheets and Mark failed.

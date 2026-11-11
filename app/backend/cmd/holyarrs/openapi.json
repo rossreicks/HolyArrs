@@ -1855,6 +1855,9 @@
             "description": "bytes",
             "type": "integer"
           },
+          "slot_id": {
+            "type": "integer"
+          },
           "slot_state": {
             "type": "string"
           },

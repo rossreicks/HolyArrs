@@ -8,6 +8,8 @@
 	"downloads.act.down": "Move down",
 	"downloads.act.forceStart": "Force start",
 	"downloads.act.library": "Open in Library",
+	"downloads.act.reimport": "Retry import",
+	"downloads.act.reimporting": "Importing again",
 	"downloads.act.markFailed": "Mark failed",
 	"downloads.act.moved": "Moved",
 	"downloads.act.movedBottom": "Moved to bottom",
