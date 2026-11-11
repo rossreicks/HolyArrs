@@ -582,12 +582,29 @@ func insideReal(root, p string) bool {
 }
 
 // downloadFiles answers the files to import. A Usenet job that finished between
-// polls never had its files listed, so its own folder is read instead.
+// polls never had its files listed, so its own folder is read instead; a listed
+// name that turned out to be a folder (seen before the job unpacked) is read too.
 func downloadFiles(d domain.Download, dr domain.Downloader, root string) []domain.SeenFile {
-	if len(d.FilesSeen) > 0 || dr.Protocol != "usenet" {
-		return d.FilesSeen
+	if len(d.FilesSeen) == 0 {
+		if dr.Protocol != "usenet" {
+			return d.FilesSeen
+		}
+		return filesUnder(root, root)
 	}
-	found, _ := Scan(root)
+	files := make([]domain.SeenFile, 0, len(d.FilesSeen))
+	for _, f := range d.FilesSeen {
+		p := filepath.Join(root, filepath.FromSlash(f.Name))
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() && under(root, p) {
+			files = append(files, filesUnder(root, p)...)
+			continue
+		}
+		files = append(files, f)
+	}
+	return files
+}
+
+func filesUnder(root, dir string) []domain.SeenFile {
+	found, _ := Scan(dir)
 	files := make([]domain.SeenFile, 0, len(found))
 	for _, c := range found {
 		if rel, err := filepath.Rel(root, c.Path); err == nil {
