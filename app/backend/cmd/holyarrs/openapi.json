@@ -20949,7 +20949,7 @@
     },
     "/api/v1/needs-decision/{id}/decide": {
       "post": {
-        "description": "id is the Slot. search: search again by hand. turn_down: turn the Release of its last Download down (for an episode, for that episode only; with pack, for everything it holds), then search again. stop: stop looking (a movie: Keep up to date off for that Version; an episode: off for that episode); the Slot goes back to wanted. pack: true acts on every episode of the same download that needs a decision. Choosing a Release by hand and trying another Version are on the Movie and show pages.",
+        "description": "id is the Slot. search: search again by hand. turn_down: turn the Release of its last Download down (for an episode, for that episode only; with pack, for everything it holds), then search again. stop: stop looking (a movie: Keep up to date off for that Version; an episode: off for that episode); the Slot goes back to wanted. retry_import: import the finished Download again, for every Slot of it that still needs a decision. pack: true acts on every episode of the same download that needs a decision. Choosing a Release by hand and trying another Version are on the Movie and show pages.",
         "operationId": "decide",
         "parameters": [
           {
@@ -20970,7 +20970,8 @@
                     "enum": [
                       "search",
                       "turn_down",
-                      "stop"
+                      "stop",
+                      "retry_import"
                     ],
                     "type": "string"
                   },

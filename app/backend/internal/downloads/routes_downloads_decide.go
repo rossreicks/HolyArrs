@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	domain "github.com/HolyArrs/holyarrs/app/backend/internal/core/model"
 	"github.com/HolyArrs/holyarrs/app/backend/internal/core/webserver"
 
+	"github.com/HolyArrs/holyarrs/app/backend/internal/importer"
 	"github.com/HolyArrs/holyarrs/app/backend/internal/sources"
 )
 
@@ -206,6 +208,8 @@ func (a *Web) needsDecision(w http.ResponseWriter, r *http.Request) {
 // errMovedOn is a Slot that left Needs a decision while a choice was made.
 var errMovedOn = errors.New("the slot no longer needs a decision")
 
+var errNotFinished = errors.New("the download has not finished")
+
 // BeforeDecide lets tests change a Slot between the read and the write.
 var BeforeDecide func()
 
@@ -218,7 +222,7 @@ func (a *Web) decide(w http.ResponseWriter, r *http.Request) {
 		Action string `json:"action"`
 		Pack   bool   `json:"pack"`
 	}
-	if !webserver.Decode(w, r, &in, `body is {"action": "search" | "turn_down" | "stop", "pack": bool (optional, for every episode of the same download)}`) {
+	if !webserver.Decode(w, r, &in, `body is {"action": "search" | "turn_down" | "stop" | "retry_import", "pack": bool (optional, for every episode of the same download)}`) {
 		return
 	}
 	list, err := a.decisions(r.Context(), id)
@@ -364,7 +368,68 @@ func (a *Web) decide(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		webserver.WriteJSON(w, http.StatusOK, map[string]any{"action": "stop", "state": to, "stopped": len(stopped)})
+	case "retry_import":
+		if dv.DownloadID == nil {
+			webserver.Fail(w, http.StatusConflict, "there is no download to import again for this "+noun)
+			return
+		}
+		dlID := *dv.DownloadID
+		var jobID int64
+		err := a.Store.Write(r.Context(), func(tx *sql.Tx) error {
+			var d domain.Download
+			if err := database.Get(r.Context(), tx, "downloads", dlID, &d); err != nil {
+				return err
+			}
+			if d.State != "finished" && d.State != "seeding" {
+				return errNotFinished
+			}
+			// Every Slot of the download still waiting on it imports again, the asked one included.
+			rows, err := tx.Query(`SELECT s.id FROM downloads dl JOIN json_each(dl.slot_ids) j JOIN slots s ON s.id = j.value
+				WHERE dl.id = ? AND s.state = 'needs_a_decision' AND (SELECT max(d.id) FROM downloads d JOIN json_each(d.slot_ids) k ON k.value = s.id) = dl.id`, dlID)
+			if err != nil {
+				return err
+			}
+			var waiting []int64
+			for rows.Next() {
+				var sid int64
+				if err := rows.Scan(&sid); err != nil {
+					rows.Close()
+					return err
+				}
+				waiting = append(waiting, sid)
+			}
+			rows.Close()
+			if !slices.Contains(waiting, id) {
+				return errMovedOn
+			}
+			for _, sid := range waiting {
+				if _, err := tx.Exec("UPDATE slots SET active_download_id = ? WHERE id = ?", dlID, sid); err != nil {
+					return err
+				}
+				if err := mediafiles.MoveSlotTx(tx, sid, mediafiles.SlotImporting, "import retried by "+who, by); err != nil {
+					return err
+				}
+			}
+			key := "import:" + itoa(dlID)
+			if err := tx.QueryRow("SELECT id FROM jobs WHERE dedupe_key = ? AND state IN ('queued','running')", key).Scan(&jobID); err != sql.ErrNoRows {
+				return err
+			}
+			j := domain.Job{Kind: importer.KindImport, Subject: &domain.Subject{Type: "download", ID: dlID}, Params: map[string]any{}, Priority: "normal",
+				State: "queued", MaxAttempts: 3, RunAfter: time.Now().UTC(), AskedBy: by, DedupeKey: &key}
+			jobID, err = database.Insert(tx, "jobs", &j, by)
+			return err
+		})
+		switch {
+		case errors.Is(err, errMovedOn):
+			webserver.Fail(w, http.StatusConflict, "this "+noun+" no longer needs a decision")
+		case errors.Is(err, errNotFinished):
+			webserver.Fail(w, http.StatusConflict, "the download for this "+noun+" has not finished")
+		case err != nil:
+			webserver.Internal(w, "api", err)
+		default:
+			webserver.WriteJSON(w, http.StatusAccepted, map[string]any{"action": in.Action, "job_id": jobID})
+		}
 	default:
-		webserver.Fail(w, http.StatusBadRequest, `action is "search", "turn_down" or "stop"`)
+		webserver.Fail(w, http.StatusBadRequest, `action is "search", "turn_down", "stop" or "retry_import"`)
 	}
 }

@@ -148,7 +148,7 @@ func (im *Importer) importShow(ctx context.Context, d domain.Download, dr domain
 		t.Episodes = append(t.Episodes, e)
 	}
 	root, rootOK := domain.MapPath(d.SavePath, dr.PathMap)
-	cands, bad := candidates(root, d.FilesSeen)
+	cands, bad := candidates(root, downloadFiles(d, dr, root))
 	if !rootOK {
 		cands, bad = nil, []mediafiles.PlanStep{unpackStep(d.SavePath, "the Downloader reported a folder with \"..\" in it")}
 	}

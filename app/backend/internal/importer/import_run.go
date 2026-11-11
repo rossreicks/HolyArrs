@@ -89,7 +89,7 @@ func (im *Importer) Import(ctx context.Context, downloadID int64, dryRun bool, b
 		year = *ti.Year
 	}
 	root, rootOK := domain.MapPath(d.SavePath, dr.PathMap)
-	cands, bad := candidates(root, d.FilesSeen)
+	cands, bad := candidates(root, downloadFiles(d, dr, root))
 	if !rootOK {
 		cands, bad = nil, []mediafiles.PlanStep{unpackStep(d.SavePath, "the Downloader reported a folder with \"..\" in it")}
 	}
